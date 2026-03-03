@@ -1,13 +1,77 @@
 {
-  "name": "inke-tinypng",
+  "name": "tinypng",
+  "displayName": "TinyPNG",
+  "description": "批量压缩 PNG/JPEG 图片，无需 API Key",
   "version": "1.0.5",
-  "description": "",
-  "main": "index.js",
+  "publisher": "inke",
+  "engines": {
+    "vscode": "^1.60.0",
+    "node": ">=14"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./extension.js",
   "bin": {
-    "ikt": "./index.js"
+    "tiny": "./index.js"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "tinypng.compressFile",
+        "title": "TinyPNG: 压缩图片"
+      },
+      {
+        "command": "tinypng.compressFolder",
+        "title": "TinyPNG: 压缩文件夹内图片"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "tinypng.compressFile",
+          "when": "resourceExtname =~ /\\.(png|jpg|jpeg)$/i",
+          "group": "7_modification@1"
+        },
+        {
+          "command": "tinypng.compressFolder",
+          "when": "explorerResourceIsFolder",
+          "group": "7_modification@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "TinyPNG",
+      "properties": {
+        "tinypng.minSize": {
+          "type": "number",
+          "default": 10,
+          "description": "最小压缩文件大小（KB），小于此值的文件将跳过"
+        },
+        "tinypng.retain": {
+          "type": "boolean",
+          "default": false,
+          "description": "保留原文件，压缩结果另存为 .tiny 后缀文件"
+        },
+        "tinypng.deep": {
+          "type": "boolean",
+          "default": true,
+          "description": "压缩文件夹时是否递归处理子目录"
+        }
+      }
+    }
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "package:vscode": "vsce package",
+    "package:npm": "npm pack"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zlh-GitHub/inke-tinypng.git"
   },
   "keywords": [],
   "author": "",
@@ -20,5 +84,8 @@
     "ora": "^5.4.1",
     "p-queue": "^6.6.2",
     "promise-retry": "^2.0.1"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.7.1"
   }
 }

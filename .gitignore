@@ -1,3 +1,4 @@
 node_modules
 ipCache.txt
 .DS_Store
+*.vsix

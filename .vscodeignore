@@ -1,0 +1,7 @@
+.git/**
+.gitignore
+.vscode/**
+test.js
+readme.md
+*.vsix
+.npmignore
