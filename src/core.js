@@ -44,7 +44,7 @@ const splitDirAndName = p => ({
 
 const streamToPromise = stream =>
   new Promise((resolve, reject) => {
-    stream.on('end', resolve);
+    stream.on('finish', resolve);
     stream.on('error', reject);
   });
 
