@@ -10,7 +10,7 @@ const os = require('os');
 const {
   singleFileCompress,
   batchFileCompress,
-} = require('./helper');
+} = require('./src/helper');
 
 // 支持 Tab 键切换选项的 list prompt
 class TabListPrompt extends ListPrompt {

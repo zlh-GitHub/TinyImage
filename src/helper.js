@@ -2,7 +2,7 @@ const path = require('path');
 const { default: PQueue } = require('p-queue');
 const _ = require('lodash');
 const { UPDATE_CONFIG_TYPE } = require('./constants');
-const config = require('./config');
+const config = require('../config');
 const {
   maxSize,
   exts,
@@ -18,7 +18,7 @@ const {
   writeFileSync,
 } = require('fs');
 
-const { fileCompress, fileFilter, commonFilter, getFileList } = require('./src/core');
+const { fileCompress, fileFilter, commonFilter, getFileList } = require('./core');
 
 console.error = str => console.log('\x1b[31m' + str + '\x1b[0m');
 console.success = str => console.log('\x1b[32m' + str + '\x1b[0m');
@@ -28,7 +28,7 @@ let currentCompressCount = 0;
 let alreadyCompressCount = 0;
 
 const updateConfig = ({ key, value, type }) => {
-  const configPath = path.join(__dirname, configFileName);
+  const configPath = path.join(__dirname, '..', configFileName);
   let cfg = readFileSync(configPath, { encoding: 'utf-8' });
   cfg = JSON.parse(cfg);
   switch (type) {
