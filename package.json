@@ -1,9 +1,9 @@
 {
-  "name": "tinypng",
-  "displayName": "TinyPNG",
+  "name": "tinyimage",
+  "displayName": "TinyImage",
   "description": "批量压缩 PNG/JPEG 图片，无需 API Key",
   "version": "1.0.6",
-  "publisher": "inke",
+  "publisher": "linkhopes",
   "engines": {
     "vscode": "^1.105.0",
     "node": ">=14"
@@ -21,42 +21,42 @@
   "contributes": {
     "commands": [
       {
-        "command": "tinypng.compressFile",
-        "title": "TinyPNG: 压缩图片"
+        "command": "tinyimage.compressFile",
+        "title": "TinyImage: 压缩图片"
       },
       {
-        "command": "tinypng.compressFolder",
-        "title": "TinyPNG: 压缩文件夹内图片"
+        "command": "tinyimage.compressFolder",
+        "title": "TinyImage: 压缩文件夹内图片"
       }
     ],
     "menus": {
       "explorer/context": [
         {
-          "command": "tinypng.compressFile",
+          "command": "tinyimage.compressFile",
           "when": "resourceExtname =~ /\\.(png|jpg|jpeg)$/i",
           "group": "7_modification@1"
         },
         {
-          "command": "tinypng.compressFolder",
+          "command": "tinyimage.compressFolder",
           "when": "explorerResourceIsFolder",
           "group": "7_modification@2"
         }
       ]
     },
     "configuration": {
-      "title": "TinyPNG",
+      "title": "TinyImage",
       "properties": {
-        "tinypng.minSize": {
+        "tinyimage.minSize": {
           "type": "number",
           "default": 10,
           "description": "最小压缩文件大小（KB），小于此值的文件将跳过"
         },
-        "tinypng.retain": {
+        "tinyimage.retain": {
           "type": "boolean",
           "default": false,
           "description": "保留原文件，压缩结果另存为 .tiny 后缀文件"
         },
-        "tinypng.deep": {
+        "tinyimage.deep": {
           "type": "boolean",
           "default": true,
           "description": "压缩文件夹时是否递归处理子目录"

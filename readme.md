@@ -1,85 +1,89 @@
-# inke-tinypng 压缩图片
+# TinyImage 压缩图片
 
-`inke-tinypng` 使用了网页版 tinypng 的压缩图片接口 `https://tinypng.com/web/shrink` ，参考借鉴了知乎专栏文章《原来TinyPNG可以这样玩!》原文链接：https://zhuanlan.zhihu.com/p/152317953 ，在该作者的基础上，加入了一些常用配置，并且可以递归遍历文件夹等。
+TinyImage 使用网页版 TinyPNG 的压缩接口 `https://tinypng.com/web/shrink` 批量压缩 PNG/JPEG 图片，**无需 API Key**。参考借鉴知乎专栏《原来TinyPNG可以这样玩!》：[原文链接](https://zhuanlan.zhihu.com/p/152317953)。
 
-说明：
+提供两种使用方式：
 
-1. 只支持压缩 `png` | `jpg` | `jpeg` 文件
-2. 受限于网页版 tinypng 的接口限制，最大只能压缩 5MB 即 5120KB 的图片 
-3. 可设置 `basePath` 方便频繁输入某个路径下的文件/文件夹的场景
-4. 可设置 `minSize` ，在执行 `dir` 压缩文件时，指定大于 `minSize` 的文件才进行压缩（单张图片压缩时该配置不生效）
-5. 默认配置 `config.basePath` 为 `./src/pages` ，`config.minSize` 为 `10` ，可进行更改
+- **VS Code 插件**：在资源管理器中右键图片/文件夹即可压缩
+- **npm 命令行**：全局安装后使用 `tiny` 进入交互式菜单，或集成到脚本
 
-安装：
+---
 
-```shell
-npm i inke-tinypng -g
+## 通用说明
+
+1. **格式**：仅支持 `png`、`jpg`、`jpeg`
+2. **大小**：受网页版接口限制，单张图片最大 5MB（5120KB）
+3. **并发**：内置队列与重试，压缩多张时自动限流
+
+---
+
+## 一、VS Code 插件
+
+### 安装
+
+在 VS Code 扩展市场搜索 **TinyImage**（publisher: linkhopes）安装，或从 [VS Code Marketplace](https://marketplace.visualstudio.com/) 安装。
+
+### 使用
+
+- **压缩单张/多张图片**：在资源管理器中右键一张或多张图片 → 选择 **「TinyImage: 压缩图片」**
+- **压缩文件夹内图片**：右键目标文件夹 → 选择 **「TinyImage: 压缩文件夹内图片」**
+
+压缩进度在通知栏显示，详细日志在输出面板的 **TinyImage** 通道中查看。
+
+### 插件配置
+
+在 VS Code 设置中搜索 `tinyimage`，可配置：
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `tinyimage.minSize` | number | 10 | 最小压缩文件大小（KB），小于此值的文件会跳过 |
+| `tinyimage.retain` | boolean | false | 为 true 时保留原文件，压缩结果另存为 `.tiny` 后缀文件 |
+| `tinyimage.deep` | boolean | true | 压缩文件夹时是否递归处理子目录 |
+
+---
+
+## 二、npm 命令行
+
+### 安装
+
+```bash
+npm i tinyimage -g
 ```
 
-使用：
+### 使用
 
-* img：`ikt img <path> [options]`
+安装后执行：
 
-  压缩单张图片，输出路径和原文件同级，默认情况下压缩输出的文件名和原文件一致，即覆盖。当配置了 `basePath` 时，最终查找的文件路径为 `basePath > path` 。基本使用：
+```bash
+tiny
+```
 
-  ```shell
-  ikt img ./public/test.png
-  ```
+会进入交互式菜单，可选：
 
-  * 选项
+- **压缩文件夹**：输入文件夹路径，递归压缩该目录下所有符合条件的图片
+- **压缩单张图片**：输入图片路径进行压缩
+- **查看当前配置**：查看 `basePath`、`minSize`
+- **修改当前配置**：设置基路径（basePath）、最小压缩大小（minSize，单位 KB）
 
-    * -r：`r` 为 `retain` 的缩写，指定该选项后压缩输出的文件名将会在原文件名的基础上添加后缀 `.tiny`
+### 配置说明（命令行）
 
-      ```shell
-      ikt img ./public/test.png -r // ==> test.tiny.png
-      ```
+- **basePath**：基路径。设置后，在「压缩单张图片」或「压缩文件夹」时输入的路径将相对于该基路径解析；留空则按当前工作目录下的绝对/相对路径解析。
+- **minSize**：最小文件大小（KB），仅对「压缩文件夹」生效，小于此大小的图片会跳过。须为正整数，且小于 5120。
 
-* dir：`ikt dir <path> [options]`
+配置保存在项目下的 `config.json` 中（与运行 `tiny` 时的当前目录相关）。
 
-  压缩文件夹里所有满足条件的图片，当配置了 `config.basePath` 时，最终查找的文件路径为 `basePath > path` 。基本使用：
+---
 
-  ```shell
-  ikt dir ./public
-  ```
+## 开发与打包
 
-  * -d：`d` 为 `deep` 的缩写，指定该选项后为深度遍历文件夹，获取所有满足条件的图片进行压缩
+- 构建：`npm run build`
+- 监听：`npm run watch`
+- 打包 VS Code 扩展：`npm run package:vscode`
+- 打包 npm 包：`npm run package:npm`
 
-    ```shell
-    ikt dir ./public -d
-    ```
+---
 
-  * -ms：`ms` 为 `minSize` 的缩写，设置压缩的最小文件大小，单位KB，设置后只有大于 `minSize` 的图片才会进行压缩，该指令后跟整数，权重大于 `config.minSize` ；
+## 许可与致谢
 
-    ```shell
-    ikt dir ./public -ms 10
-    ```
-
-  * -r：`r` 为 `retain` 的缩写，指定该选项后压缩输出的文件名将会在原文件名的基础上添加后缀 `.tiny`
-
-    ```shell
-    ikt dir ./public -r
-    ```
-
-  * -o：`o` 为 `output` 的缩写，后跟文件名/路径，指定该选项后，图片压缩后会输出到指定的文件夹中
-
-    ```shell
-    ikt dir ./public -o output // ==> 最终输出目录 ./public/output
-    ```
-
-* config：获取配置信息
-
-* config.set.basePath：设置基路径，`img` | `dir` 压缩时指定的 `path` 将相对于 `baesPath` ，`basePath` 值应为一个文件夹路径
-
-  ```shell
-  ikt config.set.basePath ./src/pages
-  ```
-
-* config.clear.basePath：删除配置的基路径
-
-  ```shell
-  ikt config.clear.basePath
-  ```
-
-* config.set.minSize：设置最小文件大小，单位KB，需为整数，并且小于5120KB，只有执行dir时，该配置才会生效，`config.minSize` 权重小于命令行 `-ms` 选项
-
-* config.clear.minSize：删除配置的最小文件大小限制
+- 接口与思路致谢：TinyPNG 网页版、知乎专栏作者
+- 本仓库许可证：ISC
