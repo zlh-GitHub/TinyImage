@@ -1,15 +1,15 @@
-const vscode = require('vscode');
-const path = require('path');
-const { existsSync, statSync } = require('fs');
-const { default: PQueue } = require('p-queue'); // 队列，用于并发压缩图片
+import * as vscode from 'vscode';
+import * as path from 'path';
+import { existsSync, statSync } from 'fs';
+import PQueue from 'p-queue';
 
-const { fileCompress, fileFilter, commonFilter, getFileList, kb2byte } = require('./src/core');
-const config = require('./config.json');
+import { fileCompress, fileFilter, commonFilter, getFileList, kb2byte } from './src/core';
+import type { CompressCallbacks, CompressResult } from './src/core';
+import config from './config.json';
 
-/** @type {vscode.OutputChannel | undefined} */
-let outputChannel;
+let outputChannel: vscode.OutputChannel | undefined;
 
-function getOutputChannel() {
+function getOutputChannel(): vscode.OutputChannel {
   if (!outputChannel) {
     outputChannel = vscode.window.createOutputChannel('TinyPNG');
   }
@@ -19,19 +19,17 @@ function getOutputChannel() {
 function getSettings() {
   const cfg = vscode.workspace.getConfiguration('tinypng');
   return {
-    minSize: cfg.get('minSize', config.minSize),
-    retain: cfg.get('retain', false),
-    deep: cfg.get('deep', true),
+    minSize: cfg.get<number>('minSize', config.minSize),
+    retain: cfg.get<boolean>('retain', false),
+    deep: cfg.get<boolean>('deep', true),
   };
 }
 
-/**
- * 创建压缩回调（绑定日志输出和进度通知）
- * @param {number} total
- * @param {(msg: string) => void} log
- * @param {{ report: (v: { message?: string, increment?: number }) => void }} progress
- */
-function makeCallbacks(total, log, progress) {
+function makeCallbacks(
+  total: number,
+  log: (msg: string) => void,
+  progress: vscode.Progress<{ message?: string; increment?: number }>,
+): CompressCallbacks & { getFailedCount: () => number } {
   let done = 0;
   let failed = 0;
   const increment = total > 0 ? 100 / total : 0;
@@ -39,7 +37,7 @@ function makeCallbacks(total, log, progress) {
     onRetry: (name, number) => {
       log(`[重试] ${name}  第 ${number} 次`);
     },
-    onSuccess: ({ name, originSize, output }) => {
+    onSuccess: ({ name, originSize, output }: CompressResult) => {
       done++;
       const optimized = ((1 - output.ratio) * 100).toFixed(1);
       const from = (originSize / 1024).toFixed(1);
@@ -50,53 +48,43 @@ function makeCallbacks(total, log, progress) {
     onError: (name, err) => {
       done++;
       failed++;
-      log(`[失败 ${done}/${total}] ${name}  ${err?.message || '未知错误'}`);
+      const msg = err instanceof Error ? err.message : '未知错误';
+      log(`[失败 ${done}/${total}] ${name}  ${msg}`);
       progress.report({ message: `${done}/${total}`, increment });
     },
     getFailedCount: () => failed,
   };
 }
 
-/**
- * 批量压缩文件列表
- * @param {{ name: string, size: number }[]} files
- * @param {{ retain: boolean, output?: string }} options
- * @param {{ report: Function }} progress
- * @returns {Promise<number>} 失败数量
- */
-async function compressFiles(files, options, progress) {
+async function compressFiles(
+  files: { name: string; size: number }[],
+  options: { retain: boolean; output?: string },
+  progress: vscode.Progress<{ message?: string; increment?: number }>,
+): Promise<number> {
   const channel = getOutputChannel();
   channel.show(true);
   channel.appendLine(`\n──────────────────────────────`);
   channel.appendLine(`开始压缩，共 ${files.length} 张图片`);
 
   const callbacks = makeCallbacks(files.length, msg => channel.appendLine(msg), progress);
-  // 并发压缩图片，config.compressConcurrency 为并发数
   const queue = new PQueue({ concurrency: config.compressConcurrency });
 
   for (const file of files) {
     queue.add(() => fileCompress(file, options, callbacks));
   }
 
-  // Returns a promise that settles when the queue becomes empty, and all promises have completed; queue.size === 0 && queue.pending === 0.
   await queue.onIdle();
   const failed = callbacks.getFailedCount();
   const succeeded = files.length - failed;
   channel.appendLine(
-    failed > 0 ? `压缩完成：${succeeded} 张成功，${failed} 张失败` : `压缩完成`
+    failed > 0 ? `压缩完成：${succeeded} 张成功，${failed} 张失败` : `压缩完成`,
   );
   channel.appendLine(`──────────────────────────────`);
   return failed;
 }
 
-/**
- * 从 URI 列表中筛选出符合条件的图片
- * @param {vscode.Uri[]} uris
- * @param {number} minSize KB
- * @returns {{ name: string, size: number }[]}
- */
-function filterImageUris(uris, minSize) {
-  return uris.reduce((res, uri) => {
+function filterImageUris(uris: vscode.Uri[], minSize: number): { name: string; size: number }[] {
+  return uris.reduce<{ name: string; size: number }[]>((res, uri) => {
     const p = uri.fsPath;
     if (!existsSync(p)) return res;
     const stats = statSync(p);
@@ -107,12 +95,10 @@ function filterImageUris(uris, minSize) {
   }, []);
 }
 
-/** @param {vscode.ExtensionContext} context */
-function activate(context) {
+export function activate(context: vscode.ExtensionContext): void {
   // ── 命令：压缩图片文件 ───────────────────────────────────────────────────
   context.subscriptions.push(
-    vscode.commands.registerCommand('tinypng.compressFile', async (uri, uris) => {
-      // 优先使用多选列表，否则用右键单击的 uri，最后尝试当前编辑器
+    vscode.commands.registerCommand('tinypng.compressFile', async (uri: vscode.Uri, uris: vscode.Uri[]) => {
       const rawUris =
         uris && uris.length > 0
           ? uris
@@ -132,7 +118,7 @@ function activate(context) {
 
       if (files.length === 0) {
         vscode.window.showWarningMessage(
-          'TinyPNG: 没有符合条件的图片',
+          'TinyPNG: 没有符合条件的图片（支持 png/jpg/jpeg，单文件上限 5MB）',
         );
         return;
       }
@@ -141,7 +127,7 @@ function activate(context) {
         {
           location: vscode.ProgressLocation.Notification,
           title: `TinyPNG 压缩中`,
-          cancellable: true,
+          cancellable: false,
         },
         async progress => {
           progress.report({ increment: 0, message: `0/${files.length}` });
@@ -150,7 +136,7 @@ function activate(context) {
           progress.report({
             message: failed > 0 ? `完成：${succeeded} 成功 ${failed} 失败` : `完成`,
           });
-          await new Promise(r => setTimeout(r, 1500));
+          await new Promise<void>(r => setTimeout(r, 1500));
           vscode.window.showInformationMessage(
             failed > 0
               ? `TinyPNG: ${succeeded} 张成功，${failed} 张失败，详情见输出面板`
@@ -163,7 +149,7 @@ function activate(context) {
 
   // ── 命令：压缩文件夹内图片 ──────────────────────────────────────────────
   context.subscriptions.push(
-    vscode.commands.registerCommand('tinypng.compressFolder', async uri => {
+    vscode.commands.registerCommand('tinypng.compressFolder', async (uri: vscode.Uri) => {
       const folderPath =
         uri?.fsPath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
@@ -185,7 +171,7 @@ function activate(context) {
         {
           location: vscode.ProgressLocation.Notification,
           title: `TinyPNG 压缩中`,
-          cancellable: true,
+          cancellable: false,
         },
         async progress => {
           progress.report({ increment: 0, message: `0/${files.length}` });
@@ -194,7 +180,7 @@ function activate(context) {
           progress.report({
             message: failed > 0 ? `完成：${succeeded} 成功 ${failed} 失败` : `完成`,
           });
-          await new Promise(r => setTimeout(r, 1500));
+          await new Promise<void>(r => setTimeout(r, 1500));
           vscode.window.showInformationMessage(
             failed > 0
               ? `TinyPNG: ${succeeded} 张成功，${failed} 张失败，详情见输出面板`
@@ -206,8 +192,6 @@ function activate(context) {
   );
 }
 
-function deactivate() {
+export function deactivate(): void {
   outputChannel?.dispose();
 }
-
-module.exports = { activate, deactivate };

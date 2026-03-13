@@ -1,25 +1,48 @@
-const path = require('path');
-const axios = require('axios');
-const promiseRetry = require('promise-retry');
-const {
-  mkdirSync,
-  existsSync,
-  createWriteStream,
-  readFileSync,
-  readdirSync,
-  statSync,
-} = require('fs');
+import path from 'path';
+import axios from 'axios';
+import promiseRetry from 'promise-retry';
+import { mkdirSync, existsSync, createWriteStream, readFileSync, readdirSync, statSync } from 'fs';
+import type { Stats } from 'fs';
 
-const config = require('../config.json');
+import config from '../config.json';
+
 const { maxSize, exts, maxRetryCount, kb2byteMuti } = config;
 
-const kb2byte = kb => kb * kb2byteMuti;
+export const kb2byte = (kb: number): number => kb * kb2byteMuti;
 
-const getRandomIP = () =>
-  Array.from(Array(4)).map(() => parseInt(Math.random() * 255)).join('.');
+export interface ImageFile {
+  name: string;
+  size: number;
+}
 
-const getAjaxOptions = IP => ({
-  method: 'POST',
+export interface CompressOutput {
+  url: string;
+  size: number;
+  ratio: number;
+}
+
+export interface CompressResult {
+  name: string;
+  originSize: number;
+  output: CompressOutput;
+}
+
+export interface CompressOptions {
+  retain: boolean;
+  output?: string;
+}
+
+export interface CompressCallbacks {
+  onRetry?: (name: string, number: number) => void;
+  onSuccess?: (result: CompressResult) => void;
+  onError?: (name: string, error: unknown) => void;
+}
+
+const getRandomIP = (): string =>
+  Array.from(Array(4)).map(() => Math.floor(Math.random() * 255)).join('.');
+
+const getAjaxOptions = (IP: string) => ({
+  method: 'POST' as const,
   url: 'https://tinify.cn/backend/opt/shrink',
   headers: {
     rejectUnauthorized: false,
@@ -32,39 +55,32 @@ const getAjaxOptions = IP => ({
   },
 });
 
-const getTinyImageName = filename => {
+const getTinyImageName = (filename: string): string => {
   const reg = new RegExp(`(.+)(?=\\.(${exts.join('|')})$)`);
   return filename.replace(reg, old => `${old}.tiny`);
 };
 
-const splitDirAndName = p => ({
+const splitDirAndName = (p: string) => ({
   dir: path.dirname(p),
   name: path.basename(p),
 });
 
-const streamToPromise = stream =>
+const streamToPromise = (stream: NodeJS.ReadableStream | NodeJS.WritableStream): Promise<void> =>
   new Promise((resolve, reject) => {
-    stream.on('finish', resolve);
-    stream.on('error', reject);
+    (stream as NodeJS.EventEmitter).on('finish', resolve);
+    (stream as NodeJS.EventEmitter).on('error', reject);
   });
 
-const commonFilter = (filename, stats) =>
+export const commonFilter = (filename: string, stats: Stats): boolean =>
   stats.size <= kb2byte(maxSize) &&
   stats.isFile() &&
   exts.includes(path.extname(filename).slice(1).toLowerCase());
 
-const getFileList = folder =>
+export const getFileList = (folder: string): string[] =>
   readdirSync(folder).map(file => path.join(folder, file));
 
-/**
- * 过滤文件，返回符合条件的图片列表
- * @param {string[]} filenameArr
- * @param {number} minSize KB
- * @param {boolean} deep 是否递归子目录
- * @returns {{ name: string, size: number }[]}
- */
-const fileFilter = (filenameArr, minSize = 0, deep) =>
-  filenameArr.reduce((res, filename) => {
+export const fileFilter = (filenameArr: string[], minSize = 0, deep?: boolean): ImageFile[] =>
+  filenameArr.reduce<ImageFile[]>((res, filename) => {
     const stats = statSync(filename);
     if (stats.size >= kb2byte(minSize) && commonFilter(filename, stats)) {
       return [...res, { name: filename, size: stats.size }];
@@ -74,13 +90,7 @@ const fileFilter = (filenameArr, minSize = 0, deep) =>
     return res;
   }, []);
 
-/**
- * 下载图片到指定目录
- * @param {string} url
- * @param {string} dir
- * @param {string} imageName
- */
-const download = async (url, dir, imageName) => {
+const download = async (url: string, dir: string, imageName: string): Promise<void> => {
   const outputPath = path.join(dir, imageName);
   const response = await axios({ method: 'get', url, responseType: 'stream' });
   if (!existsSync(dir)) {
@@ -91,13 +101,11 @@ const download = async (url, dir, imageName) => {
   await streamToPromise(writer);
 };
 
-/**
- * 压缩单张图片
- * @param {{ name: string, size: number }} image
- * @param {{ retain: boolean, output?: string }} options
- * @param {{ onRetry?: Function, onSuccess?: Function, onError?: Function }} callbacks
- */
-const fileCompress = ({ name: filename, size: originSize }, { retain, output }, callbacks = {}) => {
+export const fileCompress = (
+  { name: filename, size: originSize }: ImageFile,
+  { retain, output }: CompressOptions,
+  callbacks: CompressCallbacks = {},
+): Promise<CompressResult | undefined> => {
   const { onRetry = () => {}, onSuccess = () => {}, onError = () => {} } = callbacks;
   return promiseRetry(async (retry, number) => {
     const { dir, name } = splitDirAndName(filename);
@@ -108,10 +116,10 @@ const fileCompress = ({ name: filename, size: originSize }, { retain, output }, 
       const ajaxOptions = getAjaxOptions(getRandomIP());
       const { data } = await axios({ ...ajaxOptions, data: readFileSync(filename) });
       if (data.error) {
-        retry();
+        retry(new Error(data.error));
         return;
       }
-      const result = { name, originSize, output: data.output };
+      const result: CompressResult = { name, originSize, output: data.output };
       onSuccess(result);
       await download(
         data.output.url,
@@ -127,12 +135,4 @@ const fileCompress = ({ name: filename, size: originSize }, { retain, output }, 
       }
     }
   });
-};
-
-module.exports = {
-  fileCompress,
-  fileFilter,
-  commonFilter,
-  getFileList,
-  kb2byte,
 };
