@@ -40,7 +40,8 @@ const logSuccess = ({ name, originSize, output }: CompressResult): void => {
 const cliCallbacks: CompressCallbacks = {
   onRetry: (name, number) => console.error(`【${name}】：压缩失败！第${number}次尝试压缩\n`),
   onSuccess: logSuccess,
-  onError: (name, err) => console.error(`【${name}】：压缩失败：${err instanceof Error ? err.message : '未知错误'}`),
+  onSkip: (name) => console.warn(`${currentCompressCount ? `${++alreadyCompressCount}/${currentCompressCount}` : ''}【${name}】：压缩后更大，已跳过`),
+  onError: (name, err) => console.error(`${currentCompressCount ? `${++alreadyCompressCount}/${currentCompressCount}` : ''}【${name}】：压缩失败：${err instanceof Error ? err.message : '未知错误'}`),
 };
 
 const singleFileCompress = async (filename: string, options: { retain: boolean }): Promise<void> => {
@@ -165,15 +166,7 @@ async function promptFile(): Promise<void> {
       validate: (v: string) => v.trim() ? true : '路径不能为空',
     },
   ]);
-  const { retain } = await inquirer.prompt([
-    {
-      type: 'confirm',
-      name: 'retain',
-      message: '保留原文件（另存为 .tiny 后缀）？',
-      default: false,
-    },
-  ]);
-  await singleFileCompress(inputPath.trim(), { retain });
+  await singleFileCompress(inputPath.trim(), { retain: readConfig().retain });
 }
 
 async function promptDir(): Promise<void> {
@@ -187,18 +180,19 @@ async function promptDir(): Promise<void> {
       validate: (v: string) => v.trim() ? true : '路径不能为空',
     },
   ]);
-  batchFileCompress(inputPath.trim(), { deep: true, retain: false, output: '' });
+  batchFileCompress(inputPath.trim(), { deep: true, retain: readConfig().retain, output: '' });
 }
 
 function viewConfig(): void {
-  const { basePath: bp, minSize } = readConfig();
+  const { basePath: bp, minSize, retain } = readConfig();
   console.log(`  basePath（基路径）：${bp || '（未设置）'}`);
   console.log(`  minSize（最小压缩大小）：${minSize} KB`);
+  console.log(`  retain（保留原文件）：${retain ? '是' : '否'}`);
 }
 
 async function promptEditConfig(): Promise<void> {
   const current = readConfig();
-  const { basePath: newBasePath, minSize } = await inquirer.prompt([
+  const { basePath: newBasePath, minSize, retain } = await inquirer.prompt([
     {
       type: 'input',
       name: 'basePath',
@@ -212,8 +206,14 @@ async function promptEditConfig(): Promise<void> {
       default: current.minSize,
       validate: (v: number) => (Number.isInteger(v) && v > 0) ? true : '请输入正整数',
     },
+    {
+      type: 'confirm',
+      name: 'retain',
+      message: '保留原文件（另存为 .tiny 后缀）？',
+      default: current.retain,
+    },
   ]);
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify({ ...current, basePath: newBasePath, minSize }));
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify({ ...current, basePath: newBasePath, minSize, retain }));
   console.log('配置已更新');
 }
 

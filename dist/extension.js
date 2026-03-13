@@ -46,12 +46,12 @@ const config_json_1 = __importDefault(require("./config.json"));
 let outputChannel;
 function getOutputChannel() {
     if (!outputChannel) {
-        outputChannel = vscode.window.createOutputChannel('TinyPNG');
+        outputChannel = vscode.window.createOutputChannel('TinyImage');
     }
     return outputChannel;
 }
 function getSettings() {
-    const cfg = vscode.workspace.getConfiguration('tinypng');
+    const cfg = vscode.workspace.getConfiguration('tinyimage');
     return {
         minSize: cfg.get('minSize', config_json_1.default.minSize),
         retain: cfg.get('retain', false),
@@ -72,6 +72,11 @@ function makeCallbacks(total, log, progress) {
             const from = (originSize / 1024).toFixed(1);
             const to = (output.size / 1024).toFixed(1);
             log(`[${done}/${total}] ${name}  -${optimized}%  ${from}KB → ${to}KB`);
+            progress.report({ message: `${done}/${total}`, increment });
+        },
+        onSkip: (name) => {
+            done++;
+            log(`[跳过 ${done}/${total}] ${name}  压缩后更大，保留原文件`);
             progress.report({ message: `${done}/${total}`, increment });
         },
         onError: (name, err) => {
@@ -115,7 +120,7 @@ function filterImageUris(uris, minSize) {
 }
 function activate(context) {
     // ── 命令：压缩图片文件 ───────────────────────────────────────────────────
-    context.subscriptions.push(vscode.commands.registerCommand('tinypng.compressFile', async (uri, uris) => {
+    context.subscriptions.push(vscode.commands.registerCommand('tinyimage.compressFile', async (uri, uris) => {
         const rawUris = uris && uris.length > 0
             ? uris
             : uri
@@ -124,18 +129,18 @@ function activate(context) {
                     ? [vscode.window.activeTextEditor.document.uri]
                     : [];
         if (rawUris.length === 0) {
-            vscode.window.showWarningMessage('TinyPNG: 请在资源管理器中右键选择图片文件');
+            vscode.window.showWarningMessage('TinyImage: 请在资源管理器中右键选择图片文件');
             return;
         }
         const { retain, minSize } = getSettings();
         const files = filterImageUris(rawUris, minSize);
         if (files.length === 0) {
-            vscode.window.showWarningMessage('TinyPNG: 没有符合条件的图片（支持 png/jpg/jpeg，单文件上限 5MB）');
+            vscode.window.showWarningMessage('TinyImage: 没有符合条件的图片（支持 png/jpg/jpeg，单文件上限 5MB）');
             return;
         }
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
-            title: `TinyPNG 压缩中`,
+            title: `TinyImage 压缩中`,
             cancellable: false,
         }, async (progress) => {
             progress.report({ increment: 0, message: `0/${files.length}` });
@@ -146,28 +151,28 @@ function activate(context) {
             });
             await new Promise(r => setTimeout(r, 1500));
             vscode.window.showInformationMessage(failed > 0
-                ? `TinyPNG: ${succeeded} 张成功，${failed} 张失败，详情见输出面板`
-                : `TinyPNG: ${files.length} 张图片压缩完成，详情见输出面板`);
+                ? `TinyImage: ${succeeded} 张成功，${failed} 张失败，详情见输出面板`
+                : `TinyImage: ${files.length} 张图片压缩完成，详情见输出面板`);
         });
     }));
     // ── 命令：压缩文件夹内图片 ──────────────────────────────────────────────
-    context.subscriptions.push(vscode.commands.registerCommand('tinypng.compressFolder', async (uri) => {
+    context.subscriptions.push(vscode.commands.registerCommand('tinyimage.compressFolder', async (uri) => {
         var _a, _b, _c;
         const folderPath = (_a = uri === null || uri === void 0 ? void 0 : uri.fsPath) !== null && _a !== void 0 ? _a : (_c = (_b = vscode.workspace.workspaceFolders) === null || _b === void 0 ? void 0 : _b[0]) === null || _c === void 0 ? void 0 : _c.uri.fsPath;
         if (!folderPath || !(0, fs_1.existsSync)(folderPath)) {
-            vscode.window.showWarningMessage('TinyPNG: 请选择有效的文件夹');
+            vscode.window.showWarningMessage('TinyImage: 请选择有效的文件夹');
             return;
         }
         const { retain, minSize, deep } = getSettings();
         const fileList = (0, core_1.getFileList)(folderPath);
         const files = (0, core_1.fileFilter)(fileList, minSize, deep);
         if (files.length === 0) {
-            vscode.window.showInformationMessage('TinyPNG: 该文件夹下没有符合条件的图片');
+            vscode.window.showInformationMessage('TinyImage: 该文件夹下没有符合条件的图片');
             return;
         }
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
-            title: `TinyPNG 压缩中`,
+            title: `TinyImage 压缩中`,
             cancellable: false,
         }, async (progress) => {
             progress.report({ increment: 0, message: `0/${files.length}` });
@@ -178,8 +183,8 @@ function activate(context) {
             });
             await new Promise(r => setTimeout(r, 1500));
             vscode.window.showInformationMessage(failed > 0
-                ? `TinyPNG: ${succeeded} 张成功，${failed} 张失败，详情见输出面板`
-                : `TinyPNG: ${files.length} 张图片压缩完成，详情见输出面板`);
+                ? `TinyImage: ${succeeded} 张成功，${failed} 张失败，详情见输出面板`
+                : `TinyImage: ${files.length} 张图片压缩完成，详情见输出面板`);
         });
     }));
 }

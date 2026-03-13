@@ -5,26 +5,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.fileCompress = exports.fileFilter = exports.getFileList = exports.commonFilter = exports.kb2byte = void 0;
 const path_1 = __importDefault(require("path"));
-const axios_1 = __importDefault(require("axios"));
 const promise_retry_1 = __importDefault(require("promise-retry"));
 const fs_1 = require("fs");
 const config_json_1 = __importDefault(require("../config.json"));
+const compressors_1 = require("./compressors");
 const { maxSize, exts, maxRetryCount, kb2byteMuti } = config_json_1.default;
 const kb2byte = (kb) => kb * kb2byteMuti;
 exports.kb2byte = kb2byte;
-const getRandomIP = () => Array.from(Array(4)).map(() => Math.floor(Math.random() * 255)).join('.');
-const getAjaxOptions = (IP) => ({
-    method: 'POST',
-    url: 'https://tinify.cn/backend/opt/shrink',
-    headers: {
-        rejectUnauthorized: false,
-        'X-Forwarded-For': IP,
-        'Postman-Token': Date.now(),
-        'Cache-Control': 'no-cache',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36',
-    },
-});
 const getTinyImageName = (filename) => {
     const reg = new RegExp(`(.+)(?=\\.(${exts.join('|')})$)`);
     return filename.replace(reg, old => `${old}.tiny`);
@@ -33,13 +20,9 @@ const splitDirAndName = (p) => ({
     dir: path_1.default.dirname(p),
     name: path_1.default.basename(p),
 });
-const streamToPromise = (stream) => new Promise((resolve, reject) => {
-    stream.on('finish', resolve);
-    stream.on('error', reject);
-});
 const commonFilter = (filename, stats) => stats.size <= (0, exports.kb2byte)(maxSize) &&
     stats.isFile() &&
-    exts.includes(path_1.default.extname(filename).slice(1).toLowerCase());
+    compressors_1.defaultRegistry.getSupportedExtensions().includes(path_1.default.extname(filename).slice(1).toLowerCase());
 exports.commonFilter = commonFilter;
 const getFileList = (folder) => (0, fs_1.readdirSync)(folder).map(file => path_1.default.join(folder, file));
 exports.getFileList = getFileList;
@@ -54,33 +37,37 @@ const fileFilter = (filenameArr, minSize = 0, deep) => filenameArr.reduce((res, 
     return res;
 }, []);
 exports.fileFilter = fileFilter;
-const download = async (url, dir, imageName) => {
-    const outputPath = path_1.default.join(dir, imageName);
-    const response = await (0, axios_1.default)({ method: 'get', url, responseType: 'stream' });
-    if (!(0, fs_1.existsSync)(dir)) {
-        (0, fs_1.mkdirSync)(dir, { recursive: true });
-    }
-    const writer = (0, fs_1.createWriteStream)(outputPath);
-    response.data.pipe(writer);
-    await streamToPromise(writer);
-};
 const fileCompress = ({ name: filename, size: originSize }, { retain, output }, callbacks = {}) => {
-    const { onRetry = () => { }, onSuccess = () => { }, onError = () => { } } = callbacks;
+    const { onRetry = () => { }, onSuccess = () => { }, onSkip = () => { }, onError = () => { } } = callbacks;
     return (0, promise_retry_1.default)(async (retry, number) => {
         const { dir, name } = splitDirAndName(filename);
         if (number > 1) {
             onRetry(name, number);
         }
         try {
-            const ajaxOptions = getAjaxOptions(getRandomIP());
-            const { data } = await (0, axios_1.default)({ ...ajaxOptions, data: (0, fs_1.readFileSync)(filename) });
-            if (data.error) {
-                retry(new Error(data.error));
-                return;
+            const ext = path_1.default.extname(filename).slice(1).toLowerCase();
+            const compressor = compressors_1.defaultRegistry.get(ext);
+            if (!compressor) {
+                throw new Error(`Unsupported format: .${ext}`);
             }
-            const result = { name, originSize, output: data.output };
+            const inputBuffer = (0, fs_1.readFileSync)(filename);
+            const compressed = await compressor.compress(inputBuffer);
+            if (compressed.size >= originSize) {
+                onSkip(name);
+                return undefined;
+            }
+            const result = {
+                name,
+                originSize,
+                output: { size: compressed.size, ratio: compressed.ratio },
+            };
             onSuccess(result);
-            await download(data.output.url, output ? path_1.default.join(dir, output) : dir, retain ? getTinyImageName(name) : name);
+            const outputDir = output ? path_1.default.join(dir, output) : dir;
+            const outputName = retain ? getTinyImageName(name) : name;
+            if (!(0, fs_1.existsSync)(outputDir)) {
+                (0, fs_1.mkdirSync)(outputDir, { recursive: true });
+            }
+            (0, fs_1.writeFileSync)(path_1.default.join(outputDir, outputName), compressed.buffer);
             return result;
         }
         catch (error) {

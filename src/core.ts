@@ -1,10 +1,10 @@
 import path from 'path';
-import axios from 'axios';
 import promiseRetry from 'promise-retry';
-import { mkdirSync, existsSync, createWriteStream, readFileSync, readdirSync, statSync } from 'fs';
+import { mkdirSync, existsSync, writeFileSync, readFileSync, readdirSync, statSync } from 'fs';
 import type { Stats } from 'fs';
 
 import config from '../config.json';
+import { defaultRegistry } from './compressors';
 
 const { maxSize, exts, maxRetryCount, kb2byteMuti } = config;
 
@@ -16,7 +16,6 @@ export interface ImageFile {
 }
 
 export interface CompressOutput {
-  url: string;
   size: number;
   ratio: number;
 }
@@ -35,25 +34,9 @@ export interface CompressOptions {
 export interface CompressCallbacks {
   onRetry?: (name: string, number: number) => void;
   onSuccess?: (result: CompressResult) => void;
+  onSkip?: (name: string) => void;
   onError?: (name: string, error: unknown) => void;
 }
-
-const getRandomIP = (): string =>
-  Array.from(Array(4)).map(() => Math.floor(Math.random() * 255)).join('.');
-
-const getAjaxOptions = (IP: string) => ({
-  method: 'POST' as const,
-  url: 'https://tinify.cn/backend/opt/shrink',
-  headers: {
-    rejectUnauthorized: false,
-    'X-Forwarded-For': IP,
-    'Postman-Token': Date.now(),
-    'Cache-Control': 'no-cache',
-    'Content-Type': 'application/x-www-form-urlencoded',
-    'User-Agent':
-      'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36',
-  },
-});
 
 const getTinyImageName = (filename: string): string => {
   const reg = new RegExp(`(.+)(?=\\.(${exts.join('|')})$)`);
@@ -65,16 +48,10 @@ const splitDirAndName = (p: string) => ({
   name: path.basename(p),
 });
 
-const streamToPromise = (stream: NodeJS.ReadableStream | NodeJS.WritableStream): Promise<void> =>
-  new Promise((resolve, reject) => {
-    (stream as NodeJS.EventEmitter).on('finish', resolve);
-    (stream as NodeJS.EventEmitter).on('error', reject);
-  });
-
 export const commonFilter = (filename: string, stats: Stats): boolean =>
   stats.size <= kb2byte(maxSize) &&
   stats.isFile() &&
-  exts.includes(path.extname(filename).slice(1).toLowerCase());
+  defaultRegistry.getSupportedExtensions().includes(path.extname(filename).slice(1).toLowerCase());
 
 export const getFileList = (folder: string): string[] =>
   readdirSync(folder).map(file => path.join(folder, file));
@@ -90,42 +67,46 @@ export const fileFilter = (filenameArr: string[], minSize = 0, deep?: boolean): 
     return res;
   }, []);
 
-const download = async (url: string, dir: string, imageName: string): Promise<void> => {
-  const outputPath = path.join(dir, imageName);
-  const response = await axios({ method: 'get', url, responseType: 'stream' });
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-  const writer = createWriteStream(outputPath);
-  response.data.pipe(writer);
-  await streamToPromise(writer);
-};
-
 export const fileCompress = (
   { name: filename, size: originSize }: ImageFile,
   { retain, output }: CompressOptions,
   callbacks: CompressCallbacks = {},
 ): Promise<CompressResult | undefined> => {
-  const { onRetry = () => {}, onSuccess = () => {}, onError = () => {} } = callbacks;
+  const { onRetry = () => {}, onSuccess = () => {}, onSkip = () => {}, onError = () => {} } = callbacks;
   return promiseRetry(async (retry, number) => {
     const { dir, name } = splitDirAndName(filename);
     if (number > 1) {
       onRetry(name, number);
     }
     try {
-      const ajaxOptions = getAjaxOptions(getRandomIP());
-      const { data } = await axios({ ...ajaxOptions, data: readFileSync(filename) });
-      if (data.error) {
-        retry(new Error(data.error));
-        return;
+      const ext = path.extname(filename).slice(1).toLowerCase();
+      const compressor = defaultRegistry.get(ext);
+      if (!compressor) {
+        throw new Error(`Unsupported format: .${ext}`);
       }
-      const result: CompressResult = { name, originSize, output: data.output };
+
+      const inputBuffer = readFileSync(filename);
+      const compressed = await compressor.compress(inputBuffer);
+
+      if (compressed.size >= originSize) {
+        onSkip(name);
+        return undefined;
+      }
+
+      const result: CompressResult = {
+        name,
+        originSize,
+        output: { size: compressed.size, ratio: compressed.ratio },
+      };
       onSuccess(result);
-      await download(
-        data.output.url,
-        output ? path.join(dir, output) : dir,
-        retain ? getTinyImageName(name) : name,
-      );
+
+      const outputDir = output ? path.join(dir, output) : dir;
+      const outputName = retain ? getTinyImageName(name) : name;
+      if (!existsSync(outputDir)) {
+        mkdirSync(outputDir, { recursive: true });
+      }
+      writeFileSync(path.join(outputDir, outputName), compressed.buffer);
+
       return result;
     } catch (error) {
       if (number < maxRetryCount) {

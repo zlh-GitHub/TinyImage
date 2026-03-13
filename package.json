@@ -67,7 +67,7 @@
   "scripts": {
     "prepare": "npm run build",
     "build": "tsc",
-    "postbuild": "node -e \"const f='dist/index.js',{readFileSync:r,writeFileSync:w,chmodSync:c}=require('fs');w(f,'#!/usr/bin/env node\\n'+r(f,'utf8'));c(f,'755')\" && cp config.json dist/config.json",
+    "postbuild": "node -e \"require('fs').chmodSync('dist/index.js','755')\" && cp config.json dist/config.json",
     "watch": "tsc --watch",
     "test": "echo \"Error: no test specified\" && exit 1",
     "package:vscode": "npm run build && vsce package",
@@ -89,7 +89,8 @@
     "lodash": "^4.17.21",
     "ora": "^5.4.1",
     "p-queue": "^6.6.2",
-    "promise-retry": "^2.0.1"
+    "promise-retry": "^2.0.1",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@types/inquirer": "^8.2.12",

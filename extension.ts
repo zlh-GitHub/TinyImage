@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import { existsSync, statSync } from 'fs';
 import PQueue from 'p-queue';
 
@@ -43,6 +42,11 @@ function makeCallbacks(
       const from = (originSize / 1024).toFixed(1);
       const to = (output.size / 1024).toFixed(1);
       log(`[${done}/${total}] ${name}  -${optimized}%  ${from}KB → ${to}KB`);
+      progress.report({ message: `${done}/${total}`, increment });
+    },
+    onSkip: (name) => {
+      done++;
+      log(`[跳过 ${done}/${total}] ${name}  压缩后更大，保留原文件`);
       progress.report({ message: `${done}/${total}`, increment });
     },
     onError: (name, err) => {
