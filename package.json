@@ -1,7 +1,7 @@
 {
   "name": "tinyimage",
   "displayName": "TinyImage",
-  "description": "批量压缩 PNG/JPEG 图片，无需 API Key",
+  "description": "批量压缩 PNG/JPEG/SVG 图片，无需 API Key",
   "version": "1.0.6",
   "publisher": "linkhopes",
   "engines": {
