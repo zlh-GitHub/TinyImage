@@ -1,1 +1,1 @@
-{"exts":["png","jpg","jpeg"],"kb2byteMuti":1024,"maxSize":5120,"compressConcurrency":20,"downloadConcurrency":10,"maxRetryCount":5,"ipCacheFielName":"ipCache.txt","configFileName":"./config.json","basePath":"","minSize":10,"retain":false}
+{"exts":["png","jpg","jpeg","svg"],"kb2byteMuti":1024,"maxSize":5120,"compressConcurrency":20,"downloadConcurrency":10,"maxRetryCount":5,"ipCacheFielName":"ipCache.txt","configFileName":"./config.json","basePath":"","minSize":10,"retain":false}

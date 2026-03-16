@@ -33,7 +33,7 @@
       "explorer/context": [
         {
           "command": "tinyimage.compressFile",
-          "when": "resourceExtname =~ /\\.(png|jpg|jpeg)$/i",
+          "when": "resourceExtname =~ /\\.(png|jpg|jpeg|svg)$/i",
           "group": "7_modification@1"
         },
         {
@@ -90,7 +90,8 @@
     "ora": "^5.4.1",
     "p-queue": "^6.6.2",
     "promise-retry": "^2.0.1",
-    "sharp": "^0.34.5"
+    "sharp": "^0.34.5",
+    "svgo": "^4.0.1"
   },
   "devDependencies": {
     "@types/inquirer": "^8.2.12",

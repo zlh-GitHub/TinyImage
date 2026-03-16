@@ -135,7 +135,7 @@ function activate(context) {
         const { retain, minSize } = getSettings();
         const files = filterImageUris(rawUris, minSize);
         if (files.length === 0) {
-            vscode.window.showWarningMessage('TinyImage: 没有符合条件的图片（支持 png/jpg/jpeg，单文件上限 5MB）');
+            vscode.window.showWarningMessage(`TinyImage: 没有符合条件的图片（支持 ${config_json_1.default.exts.join('/')}，单文件上限 5MB）`);
             return;
         }
         await vscode.window.withProgress({

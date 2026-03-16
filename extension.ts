@@ -122,7 +122,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
       if (files.length === 0) {
         vscode.window.showWarningMessage(
-          'TinyImage: 没有符合条件的图片（支持 png/jpg/jpeg，单文件上限 5MB）',
+          `TinyImage: 没有符合条件的图片（支持 ${config.exts.join('/')}，单文件上限 5MB）`,
         );
         return;
       }
