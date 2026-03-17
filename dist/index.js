@@ -183,7 +183,7 @@ async function promptFile() {
             message: '图片路径：',
             suggestOnly: true,
             source: createPathSource(),
-            validate: (v) => v.trim() ? true : '路径不能为空',
+            validate: (v) => ((v === null || v === void 0 ? void 0 : v.trim()) ? true : '路径不能为空'),
         },
     ]);
     await singleFileCompress(inputPath.trim(), { retain: readConfig().retain });
@@ -196,7 +196,7 @@ async function promptDir() {
             message: '文件夹路径：',
             suggestOnly: true,
             source: createPathSource(true),
-            validate: (v) => v.trim() ? true : '路径不能为空',
+            validate: (v) => ((v === null || v === void 0 ? void 0 : v.trim()) ? true : '路径不能为空'),
         },
     ]);
     batchFileCompress(inputPath.trim(), { deep: true, retain: readConfig().retain, output: '' });
