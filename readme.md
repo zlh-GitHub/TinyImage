@@ -1,19 +1,17 @@
 # TinyImage 压缩图片
 
-TinyImage 使用网页版 TinyPNG 的压缩接口 `https://tinypng.com/web/shrink` 批量压缩 PNG/JPEG 图片，**无需 API Key**。参考借鉴知乎专栏《原来TinyPNG可以这样玩!》：[原文链接](https://zhuanlan.zhihu.com/p/152317953)。
-
-提供两种使用方式：
+TinyImage 支持多种图片格式的压缩，提供两种使用方式：
 
 - **VS Code 插件**：在资源管理器中右键图片/文件夹即可压缩
 - **npm 命令行**：全局安装后使用 `tiny` 进入交互式菜单，或集成到脚本
 
----
+### 支持格式
 
-## 通用说明
-
-1. **格式**：仅支持 `png`、`jpg`、`jpeg`
-2. **大小**：受网页版接口限制，单张图片最大 5MB（5120KB）
-3. **并发**：内置队列与重试，压缩多张时自动限流
+| 格式 | 压缩方式 | 说明 |
+|------|----------|------|
+| PNG | TinyPNG 接口（云端） | 无需 API Key，最大 5MB |
+| JPG / JPEG | MozJPEG（本地） | 自适应质量，最大 5MB |
+| SVG | SVGO（本地） | 多轮优化，移除冗余节点 |
 
 ---
 
@@ -21,7 +19,7 @@ TinyImage 使用网页版 TinyPNG 的压缩接口 `https://tinypng.com/web/shrin
 
 ### 安装
 
-在 VS Code 扩展市场搜索 **TinyImage**（publisher: linkhopes）安装，或从 [VS Code Marketplace](https://marketplace.visualstudio.com/) 安装。
+在 VS Code 扩展市场搜索 **TinyImage**（publisher: linkhopes）安装。
 
 ### 使用
 
@@ -58,32 +56,36 @@ npm i tinyimage -g
 tiny
 ```
 
-会进入交互式菜单，可选：
+进入交互式菜单，可选：
 
 - **压缩文件夹**：输入文件夹路径，递归压缩该目录下所有符合条件的图片
 - **压缩单张图片**：输入图片路径进行压缩
-- **查看当前配置**：查看 `basePath`、`minSize`
-- **修改当前配置**：设置基路径（basePath）、最小压缩大小（minSize，单位 KB）
+- **查看当前配置**：查看 `basePath`、`minSize`、`retain`
+- **修改当前配置**：设置基路径、最小压缩大小、是否保留原文件
 
-### 配置说明（命令行）
+### 配置说明
 
-- **basePath**：基路径。设置后，在「压缩单张图片」或「压缩文件夹」时输入的路径将相对于该基路径解析；留空则按当前工作目录下的绝对/相对路径解析。
-- **minSize**：最小文件大小（KB），仅对「压缩文件夹」生效，小于此大小的图片会跳过。须为正整数，且小于 5120。
+| 配置项 | 说明 |
+|--------|------|
+| `basePath` | 基路径。设置后输入的路径将相对于该基路径解析；留空则按当前工作目录解析 |
+| `minSize` | 最小文件大小（KB），小于此大小的图片跳过，须为正整数 |
+| `retain` | 为 true 时保留原文件，压缩结果另存为 `.tiny` 后缀文件 |
 
-配置保存在项目下的 `config.json` 中（与运行 `tiny` 时的当前目录相关）。
+配置保存在 `config.json` 中。
 
 ---
 
 ## 开发与打包
 
-- 构建：`npm run build`
-- 监听：`npm run watch`
-- 打包 VS Code 扩展：`npm run package:vscode`
-- 打包 npm 包：`npm run package:npm`
+```bash
+npm run build          # 编译 TypeScript
+npm run watch          # 监听模式
+npm run package:vscode # 打包 VS Code 扩展（.vsix）
+npm run package:npm    # 打包 npm 包
+```
 
 ---
 
-## 许可与致谢
+## 许可
 
-- 接口与思路致谢：TinyPNG 网页版、知乎专栏作者
-- 本仓库许可证：ISC
+ISC
