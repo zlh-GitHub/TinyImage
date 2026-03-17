@@ -75,8 +75,18 @@ const singleFileCompress = async (filename, options) => {
         return;
     }
     const stats = fs.statSync(fullFilename);
-    if (!(0, core_1.commonFilter)(fullFilename, stats)) {
-        console.warn('文件不满足要求，请确认');
+    const { minSize } = readConfig();
+    const reason = (0, core_1.rejectReason)(fullFilename, minSize);
+    if (reason === 'unsupported') {
+        console.warn(`不支持的文件格式，支持格式：${config_json_1.default.exts.join('/')}`);
+        return;
+    }
+    if (reason === 'tooLarge') {
+        console.warn(`文件超过大小上限（${config_json_1.default.maxSize / 1024}MB）`);
+        return;
+    }
+    if (reason === 'tooSmall') {
+        console.warn(`文件小于最小压缩大小（${minSize}KB）`);
         return;
     }
     await (0, core_1.fileCompress)({ name: fullFilename, size: stats.size }, options, cliCallbacks);
@@ -96,6 +106,11 @@ const batchFileCompress = (inputPath, options) => {
     }
     const fileList = (0, core_1.getFileList)(fullPath);
     const filteredList = (0, core_1.fileFilter)(fileList, minSize, deep);
+    if (filteredList.length === 0) {
+        const allPaths = (0, core_1.getAllFilePaths)(fullPath, deep);
+        console.warn((0, core_1.buildNoFilesMessage)(allPaths, minSize));
+        return;
+    }
     currentCompressCount = filteredList.length;
     alreadyCompressCount = 0;
     console.log('此次处理文件的数量:', currentCompressCount);

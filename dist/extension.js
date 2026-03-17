@@ -106,18 +106,23 @@ async function compressFiles(files, options, progress) {
     channel.appendLine(`──────────────────────────────`);
     return failed;
 }
-function filterImageUris(uris, minSize) {
-    return uris.reduce((res, uri) => {
-        const p = uri.fsPath;
+// ── 文件过滤 ─────────────────────────────────────────────────────────────
+/** 从一组路径中提取符合条件的图片文件 */
+function classifyPaths(filePaths, minSize) {
+    const files = [];
+    for (const p of filePaths) {
         if (!(0, fs_1.existsSync)(p))
-            return res;
+            continue;
         const stats = (0, fs_1.statSync)(p);
-        if ((0, core_1.commonFilter)(p, stats) && stats.size >= (0, core_1.kb2byte)(minSize)) {
-            res.push({ name: p, size: stats.size });
+        if (!stats.isFile())
+            continue;
+        if ((0, core_1.rejectReason)(p, minSize) === null) {
+            files.push({ name: p, size: stats.size });
         }
-        return res;
-    }, []);
+    }
+    return files;
 }
+// ─────────────────────────────────────────────────────────────────────────────
 function activate(context) {
     // ── 命令：压缩图片文件 ───────────────────────────────────────────────────
     context.subscriptions.push(vscode.commands.registerCommand('tinyimage.compressFile', async (uri, uris) => {
@@ -133,9 +138,10 @@ function activate(context) {
             return;
         }
         const { retain, minSize } = getSettings();
-        const files = filterImageUris(rawUris, minSize);
+        const rawPaths = rawUris.map(u => u.fsPath);
+        const files = classifyPaths(rawPaths, minSize);
         if (files.length === 0) {
-            vscode.window.showWarningMessage(`TinyImage: 没有符合条件的图片（支持 ${config_json_1.default.exts.join('/')}，单文件上限 5MB）`);
+            vscode.window.showWarningMessage('TinyImage: ' + (0, core_1.buildNoFilesMessage)(rawPaths, minSize));
             return;
         }
         await vscode.window.withProgress({
@@ -164,10 +170,11 @@ function activate(context) {
             return;
         }
         const { retain, minSize, deep } = getSettings();
-        const fileList = (0, core_1.getFileList)(folderPath);
-        const files = (0, core_1.fileFilter)(fileList, minSize, deep);
+        // fileFilter 用于实际压缩；classifyPaths 用于诊断空结果原因
+        const files = (0, core_1.fileFilter)([folderPath], minSize, deep);
         if (files.length === 0) {
-            vscode.window.showInformationMessage('TinyImage: 该文件夹下没有符合条件的图片');
+            const allPaths = (0, core_1.getAllFilePaths)(folderPath, deep);
+            vscode.window.showInformationMessage('TinyImage: ' + (0, core_1.buildNoFilesMessage)(allPaths, minSize));
             return;
         }
         await vscode.window.withProgress({

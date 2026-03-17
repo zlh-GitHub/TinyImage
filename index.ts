@@ -9,7 +9,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
-import { fileCompress, fileFilter, commonFilter, getFileList } from './src/core';
+import { fileCompress, fileFilter, getFileList, rejectReason, getAllFilePaths, buildNoFilesMessage } from './src/core';
 import type { CompressCallbacks, CompressResult } from './src/core';
 import config from './config.json';
 
@@ -20,6 +20,7 @@ declare global {
 }
 
 const { compressConcurrency, basePath, kb2byteMuti } = config;
+
 
 console.error = (str: string) => console.log('\x1b[31m' + str + '\x1b[0m');
 console.success = (str: string) => console.log('\x1b[32m' + str + '\x1b[0m');
@@ -51,8 +52,18 @@ const singleFileCompress = async (filename: string, options: { retain: boolean }
     return;
   }
   const stats = fs.statSync(fullFilename);
-  if (!commonFilter(fullFilename, stats)) {
-    console.warn('文件不满足要求，请确认');
+  const { minSize } = readConfig();
+  const reason = rejectReason(fullFilename, minSize);
+  if (reason === 'unsupported') {
+    console.warn(`不支持的文件格式，支持格式：${config.exts.join('/')}`);
+    return;
+  }
+  if (reason === 'tooLarge') {
+    console.warn(`文件超过大小上限（${config.maxSize / 1024}MB）`);
+    return;
+  }
+  if (reason === 'tooSmall') {
+    console.warn(`文件小于最小压缩大小（${minSize}KB）`);
     return;
   }
   await fileCompress({ name: fullFilename, size: stats.size }, options, cliCallbacks);
@@ -73,6 +84,11 @@ const batchFileCompress = (inputPath: string, options: { deep: boolean; retain: 
   }
   const fileList = getFileList(fullPath);
   const filteredList = fileFilter(fileList, minSize, deep);
+  if (filteredList.length === 0) {
+    const allPaths = getAllFilePaths(fullPath, deep);
+    console.warn(buildNoFilesMessage(allPaths, minSize));
+    return;
+  }
   currentCompressCount = filteredList.length;
   alreadyCompressCount = 0;
   console.log('此次处理文件的数量:', currentCompressCount);
