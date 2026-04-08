@@ -25,6 +25,8 @@ contents_dir = sys.argv[1]
 # 嵌入到 Automator 工作流的 shell 脚本
 # 当用户在 Finder 右键点击后，此脚本以选中路径作为 "$@" 参数运行
 EMBEDDED_SHELL = r"""export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.npm-global/bin:$PATH"
+# 跳过 Volta shim 的文件系统版本检测，避免触发 macOS 权限弹窗，使用 Volta 默认 Node 版本
+export VOLTA_BYPASS=1
 
 TINY=$(which tiny 2>/dev/null)
 if [ -z "$TINY" ]; then
