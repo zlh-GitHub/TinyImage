@@ -1,9 +1,10 @@
 # TinyImage 压缩图片
 
-TinyImage 支持多种图片格式的压缩，提供两种使用方式：
+TinyImage 支持多种图片格式的压缩，提供三种使用方式：
 
 - **VS Code 插件**：在资源管理器中右键图片/文件夹即可压缩
-- **npm 命令行**：全局安装后使用 `tiny` 进入交互式菜单
+- **npm 命令行**：全局安装后使用 `tiny` 进入交互式菜单，或 `tiny compress <路径>` 直接压缩
+- **macOS Finder 快速操作**：运行安装脚本后，在 Finder 中右键图片/文件夹即可压缩
 
 ### 支持格式
 
@@ -50,6 +51,8 @@ npm i tinyimage -g
 
 ### 使用
 
+**交互式菜单模式**
+
 ```bash
 tiny
 ```
@@ -59,6 +62,15 @@ tiny
 - **压缩文件夹**：递归压缩该目录下所有符合条件的图片
 - **压缩单张图片**：输入图片路径进行压缩
 - **查看当前配置** / **修改当前配置**
+
+**直接压缩模式**
+
+```bash
+tiny compress /path/to/folder     # 直接压缩文件夹（递归）
+tiny compress /path/to/image.png  # 直接压缩单张图片
+```
+
+跳过交互菜单，压缩完成后自动退出。适合脚本调用或 macOS 快速操作等场景。
 
 ### 配置说明（`config.json`）
 
@@ -70,7 +82,50 @@ tiny
 
 ---
 
-## 三、开发
+## 三、macOS Finder 快速操作
+
+在 Finder 中右键选中图片或文件夹，通过「快速操作」菜单一键压缩，无需打开终端。
+
+### 前提条件
+
+已全局安装 CLI：
+
+```bash
+npm i tinyimage -g
+# 或本地开发时
+npm link
+```
+
+### 安装
+
+```bash
+chmod +x install-macos-service.sh
+./install-macos-service.sh
+```
+
+脚本会在 `~/Library/Services/` 下生成 `TinyImage压缩.workflow` 并刷新服务缓存。
+
+### 使用
+
+在 Finder 中选中一张或多张图片（或包含图片的文件夹）→ 右键 → **快速操作 → TinyImage压缩**。
+
+点击后在后台静默压缩，通过 macOS 通知中心反馈进度：
+
+- 开始时推送「正在压缩，请稍候...」
+- 完成后推送结果，例如「成功 8 张，跳过 1 张」
+
+> 如果「快速操作」子菜单中没有出现「TinyImage压缩」，前往：
+> **系统设置 → 隐私与安全性 → 扩展 → Finder**，勾选「TinyImage压缩」。
+
+### 卸载
+
+```bash
+rm -rf ~/Library/Services/TinyImage压缩.workflow
+```
+
+---
+
+## 四、开发
 
 ### 环境要求
 
@@ -140,7 +195,7 @@ export const defaultRegistry = new CompressorRegistry()
 
 ---
 
-## 四、调试
+## 五、调试
 
 项目内置了两个 VS Code 调试配置（`.vscode/launch.json`）：
 
@@ -181,7 +236,7 @@ tiny
 
 ---
 
-## 五、打包
+## 六、打包
 
 ### VS Code 扩展（.vsix）
 
@@ -201,7 +256,7 @@ npm run package:npm
 
 ---
 
-## 六、发布
+## 七、发布
 
 ### 发布 VS Code 扩展
 

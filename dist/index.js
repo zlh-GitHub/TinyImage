@@ -46,6 +46,7 @@ const p_queue_1 = __importDefault(require("p-queue"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
+const commander_1 = require("commander");
 const core_1 = require("./src/core");
 const config_json_1 = __importDefault(require("./config.json"));
 const { compressConcurrency, basePath, kb2byteMuti } = config_json_1.default;
@@ -279,10 +280,59 @@ async function main() {
             break;
     }
 }
-main().catch(err => {
-    // 用户 Ctrl+C 退出，静默处理
-    if (err.message && !err.message.includes('force closed')) {
-        console.error(err.message);
+async function compressDirect(inputPath) {
+    const resolvedPath = path.resolve(inputPath.replace(/^~/, os.homedir()));
+    if (!fs.existsSync(resolvedPath)) {
+        console.warn(`路径不存在：${resolvedPath}`);
+        return;
     }
+    const stats = fs.statSync(resolvedPath);
+    const { minSize, retain } = readConfig();
+    if (stats.isDirectory()) {
+        const fileList = (0, core_1.getFileList)(resolvedPath);
+        const filteredList = (0, core_1.fileFilter)(fileList, minSize, true);
+        if (filteredList.length === 0) {
+            const allPaths = (0, core_1.getAllFilePaths)(resolvedPath, true);
+            console.warn((0, core_1.buildNoFilesMessage)(allPaths, minSize));
+            return;
+        }
+        currentCompressCount = filteredList.length;
+        alreadyCompressCount = 0;
+        console.log('此次处理文件的数量:', currentCompressCount);
+        const queue = new p_queue_1.default({ concurrency: compressConcurrency, autoStart: false });
+        filteredList.forEach(file => {
+            queue.add(() => (0, core_1.fileCompress)(file, { output: '', retain }, cliCallbacks));
+        });
+        queue.start();
+        await queue.onIdle();
+    }
+    else {
+        await singleFileCompress(resolvedPath, { retain });
+    }
+}
+const program = new commander_1.Command();
+program
+    .name('tiny')
+    .description('TinyPNG 图片压缩工具')
+    .addHelpCommand(false)
+    .action(() => {
+    // 无子命令时启动交互菜单
+    main().catch(err => {
+        if (err.message && !err.message.includes('force closed')) {
+            console.error(err.message);
+        }
+    });
 });
+program
+    .command('compress <path>')
+    .description('直接压缩指定路径的图片或文件夹，不启动交互菜单')
+    .action((inputPath) => {
+    compressDirect(inputPath)
+        .then(() => process.exit(0))
+        .catch(err => {
+        console.error(err instanceof Error ? err.message : String(err));
+        process.exit(1);
+    });
+});
+program.parse(process.argv);
 //# sourceMappingURL=index.js.map

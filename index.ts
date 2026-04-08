@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
+import { Command } from 'commander';
 import { fileCompress, fileFilter, getFileList, rejectReason, getAllFilePaths, buildNoFilesMessage } from './src/core';
 import type { CompressCallbacks, CompressResult } from './src/core';
 import config from './config.json';
@@ -266,9 +267,62 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch(err => {
-  // 用户 Ctrl+C 退出，静默处理
-  if (err.message && !err.message.includes('force closed')) {
-    console.error(err.message);
+async function compressDirect(inputPath: string): Promise<void> {
+  const resolvedPath = path.resolve(inputPath.replace(/^~/, os.homedir()));
+  if (!fs.existsSync(resolvedPath)) {
+    console.warn(`路径不存在：${resolvedPath}`);
+    return;
   }
-});
+  const stats = fs.statSync(resolvedPath);
+  const { minSize, retain } = readConfig();
+
+  if (stats.isDirectory()) {
+    const fileList = getFileList(resolvedPath);
+    const filteredList = fileFilter(fileList, minSize, true);
+    if (filteredList.length === 0) {
+      const allPaths = getAllFilePaths(resolvedPath, true);
+      console.warn(buildNoFilesMessage(allPaths, minSize));
+      return;
+    }
+    currentCompressCount = filteredList.length;
+    alreadyCompressCount = 0;
+    console.log('此次处理文件的数量:', currentCompressCount);
+    const queue = new PQueue({ concurrency: compressConcurrency, autoStart: false });
+    filteredList.forEach(file => {
+      queue.add(() => fileCompress(file, { output: '', retain }, cliCallbacks));
+    });
+    queue.start();
+    await queue.onIdle();
+  } else {
+    await singleFileCompress(resolvedPath, { retain });
+  }
+}
+
+const program = new Command();
+
+program
+  .name('tiny')
+  .description('TinyPNG 图片压缩工具')
+  .addHelpCommand(false)
+  .action(() => {
+    // 无子命令时启动交互菜单
+    main().catch(err => {
+      if (err.message && !err.message.includes('force closed')) {
+        console.error(err.message);
+      }
+    });
+  });
+
+program
+  .command('compress <path>')
+  .description('直接压缩指定路径的图片或文件夹，不启动交互菜单')
+  .action((inputPath: string) => {
+    compressDirect(inputPath)
+      .then(() => process.exit(0))
+      .catch(err => {
+        console.error(err instanceof Error ? err.message : String(err));
+        process.exit(1);
+      });
+  });
+
+program.parse(process.argv);
