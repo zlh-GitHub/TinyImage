@@ -325,4 +325,20 @@ program
       });
   });
 
+program
+  .command('install-service')
+  .description('安装 macOS Finder 快速操作（右键菜单 + 键盘快捷键）')
+  .action(() => {
+    const scriptPath = path.join(__dirname, '..', 'install-macos-service.sh');
+    if (!fs.existsSync(scriptPath)) {
+      console.error('未找到安装脚本，请确认 npm 包完整性');
+      process.exit(1);
+    }
+    fs.chmodSync(scriptPath, '755');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { spawnSync } = require('child_process') as typeof import('child_process');
+    const result = spawnSync('/bin/bash', [scriptPath], { stdio: 'inherit' });
+    process.exit(result.status ?? 0);
+  });
+
 program.parse(process.argv);

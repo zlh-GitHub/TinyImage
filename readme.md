@@ -1,5 +1,16 @@
 # TinyImage 压缩图片
 
+## 快速上手（新同事）
+
+```bash
+npm i tinyimage -g          # 全局安装
+tiny install-service        # 安装 macOS Finder 快速操作
+```
+
+安装完成后，在 Finder 选中图片或文件夹，按 `⌘⇧M`（或安装时自定义的快捷键）即可压缩。
+
+---
+
 TinyImage 支持多种图片格式的压缩，提供三种使用方式：
 
 - **VS Code 插件**：在资源管理器中右键图片/文件夹即可压缩

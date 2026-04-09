@@ -77,8 +77,13 @@
     "type": "git",
     "url": "https://github.com/zlh-GitHub/inke-tinypng.git"
   },
-  "keywords": [],
-  "author": "",
+  "files": [
+    "dist/",
+    "config.json",
+    "install-macos-service.sh"
+  ],
+  "keywords": ["image", "compress", "png", "jpg", "svg", "tinypng", "cli", "vscode"],
+  "author": "zhanglinhao",
   "license": "ISC",
   "dependencies": {
     "axios": "^0.21.4",
