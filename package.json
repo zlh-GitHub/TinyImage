@@ -2,7 +2,7 @@
   "name": "tinyimage",
   "displayName": "TinyImage",
   "description": "批量压缩 PNG/JPEG/SVG 图片，无需 API Key",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "linkhopes",
   "engines": {
     "vscode": "^1.105.0",

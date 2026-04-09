@@ -9,6 +9,11 @@ WORKFLOW_DIR="$HOME/Library/Services/${SERVICE_NAME}.workflow"
 CONTENTS_DIR="$WORKFLOW_DIR/Contents"
 
 echo "📦 正在安装 Finder 右键快速操作: ${SERVICE_NAME}"
+echo ""
+printf '请输入快捷键（@=⌘ ^=⌃ ~=⌥ $=⇧，默认 @$m 即 ⌘⇧M，留空跳过）: '
+read -r SHORTCUT
+[ -z "$SHORTCUT" ] && SHORTCUT='@$m'
+echo ""
 
 mkdir -p "$CONTENTS_DIR"
 
@@ -16,11 +21,12 @@ mkdir -p "$CONTENTS_DIR"
 # 生成 document.wflow（Automator 工作流定义）
 # 使用 Python 处理 XML 转义，避免 shell 引号嵌套问题
 # ---------------------------------------------------------------
-python3 - "$CONTENTS_DIR" << 'PYEOF'
+python3 - "$CONTENTS_DIR" "$SHORTCUT" << 'PYEOF'
 import sys
 import xml.sax.saxutils as saxutils
 
 contents_dir = sys.argv[1]
+shortcut = sys.argv[2] if len(sys.argv) > 2 else ""
 
 # 嵌入到 Automator 工作流的 shell 脚本
 # 当用户在 Finder 右键点击后，此脚本以选中路径作为 "$@" 参数运行
@@ -34,28 +40,34 @@ if [ -z "$TINY" ]; then
   exit 1
 fi
 
-# 发送开始通知
-osascript -e 'display notification "正在压缩，请稍候..." with title "TinyImage"'
+# 将选中路径写入临时列表（NUL 分隔，兼容含空格文件名）
+TMPLIST=$(mktemp /tmp/tinyimage_list_XXXXX)
+TMPSCRIPT=$(mktemp /tmp/tinyimage_run_XXXXX)
 
-TOTAL_SUCCESS=0
-TOTAL_SKIP=0
-TOTAL_ERROR=0
+printf '%s\0' "$@" > "$TMPLIST"
 
-for f in "$@"; do
-  OUTPUT=$("$TINY" compress "$f" 2>&1)
-  S=$(printf '%s\n' "$OUTPUT" | grep -c "压缩成功" || true)
-  SK=$(printf '%s\n' "$OUTPUT" | grep -c "已跳过" || true)
-  E=$(printf '%s\n' "$OUTPUT" | grep -c "压缩失败" || true)
-  TOTAL_SUCCESS=$((TOTAL_SUCCESS + S))
-  TOTAL_SKIP=$((TOTAL_SKIP + SK))
-  TOTAL_ERROR=$((TOTAL_ERROR + E))
-done
+cat > "$TMPSCRIPT" << 'INNER'
+#!/bin/bash
+# $1 = 路径列表文件，$2 = tiny 可执行文件完整路径
+TMPLIST="$1"
+TINY="$2"
+echo "================================================"
+echo "  TinyImage 图片压缩"
+echo "================================================"
+while IFS= read -r -d '' f; do
+  "$TINY" compress "$f"
+done < "$TMPLIST"
+rm -f "$TMPLIST"
+echo "================================================"
+echo "按回车键关闭窗口..."
+read
+osascript -e 'tell application "Terminal" to close first window'
+INNER
 
-# 发送完成通知
-MSG="成功 ${TOTAL_SUCCESS} 张"
-[ "$TOTAL_SKIP" -gt 0 ] && MSG="${MSG}，跳过 ${TOTAL_SKIP} 张"
-[ "$TOTAL_ERROR" -gt 0 ] && MSG="${MSG}，失败 ${TOTAL_ERROR} 张"
-osascript -e "display notification \"${MSG}\" with title \"TinyImage ✅\" sound name \"Glass\""
+chmod +x "$TMPSCRIPT"
+# 将已解析的 $TINY 路径作为第二参数传入，避免内层脚本在 VOLTA_BYPASS 环境下重新查找
+osascript -e "tell application \"Terminal\" to do script \"'$TMPSCRIPT' '$TMPLIST' '$TINY'; rm -f '$TMPSCRIPT'\""
+osascript -e 'tell application "Terminal" to activate'
 """
 
 escaped_shell = saxutils.escape(EMBEDDED_SHELL)
@@ -201,41 +213,54 @@ with open(output_path, "w", encoding="utf-8") as f:
     f.write(doc_wflow)
 
 print("  ✅ document.wflow 写入完成")
+
+# ── 生成 Info.plist（含可选快捷键）────────────────────────────────
+key_equiv_block = ""
+if shortcut:
+    key_equiv_block = (
+        "\t\t\t<key>NSKeyEquivalent</key>\n"
+        "\t\t\t<dict>\n"
+        "\t\t\t\t<key>default</key>\n"
+        "\t\t\t\t<string>" + saxutils.escape(shortcut) + "</string>\n"
+        "\t\t\t</dict>\n"
+    )
+
+info_plist = (
+    '<?xml version="1.0" encoding="UTF-8"?>\n'
+    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+    '<plist version="1.0">\n'
+    '<dict>\n'
+    '\t<key>NSServices</key>\n'
+    '\t<array>\n'
+    '\t\t<dict>\n'
+    '\t\t\t<key>NSMenuItem</key>\n'
+    '\t\t\t<dict>\n'
+    '\t\t\t\t<key>default</key>\n'
+    '\t\t\t\t<string>TinyImage压缩</string>\n'
+    '\t\t\t</dict>\n'
+    + key_equiv_block +
+    '\t\t\t<key>NSMessage</key>\n'
+    '\t\t\t<string>runWorkflowAsService</string>\n'
+    '\t\t\t<key>NSPortName</key>\n'
+    '\t\t\t<string>TinyImage压缩</string>\n'
+    '\t\t\t<key>NSRequiredContext</key>\n'
+    '\t\t\t<dict/>\n'
+    '\t\t\t<key>NSSendFileTypes</key>\n'
+    '\t\t\t<array>\n'
+    '\t\t\t\t<string>public.item</string>\n'
+    '\t\t\t</array>\n'
+    '\t\t</dict>\n'
+    '\t</array>\n'
+    '</dict>\n'
+    '</plist>'
+)
+
+info_path = contents_dir + "/Info.plist"
+with open(info_path, "w", encoding="utf-8") as f:
+    f.write(info_plist)
+
+print("  ✅ Info.plist 写入完成")
 PYEOF
-
-# ---------------------------------------------------------------
-# 生成 Info.plist
-# ---------------------------------------------------------------
-cat > "$CONTENTS_DIR/Info.plist" << 'INFOPLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>NSServices</key>
-	<array>
-		<dict>
-			<key>NSMenuItem</key>
-			<dict>
-				<key>default</key>
-				<string>TinyImage压缩</string>
-			</dict>
-			<key>NSMessage</key>
-			<string>runWorkflowAsService</string>
-			<key>NSPortName</key>
-			<string>TinyImage压缩</string>
-			<key>NSRequiredContext</key>
-			<dict/>
-			<key>NSSendFileTypes</key>
-			<array>
-				<string>public.item</string>
-			</array>
-		</dict>
-	</array>
-</dict>
-</plist>
-INFOPLIST
-
-echo "  ✅ Info.plist 写入完成"
 
 # ---------------------------------------------------------------
 # 刷新 macOS 服务缓存
@@ -247,6 +272,11 @@ echo "✅ 安装完成！"
 echo ""
 echo "使用方式："
 echo "  在 Finder 中选中图片或文件夹 → 右键 → 快速操作 → TinyImage压缩"
+if [ -n "$SHORTCUT" ]; then
+  echo "  或直接使用快捷键：${SHORTCUT}（选中文件时生效）"
+  echo ""
+  echo "  若快捷键不生效，请在「系统设置 → 键盘 → 键盘快捷键 → 服务」中手动确认并勾选"
+fi
 echo ""
 echo "如果菜单没有出现，请手动启用："
 echo "  系统设置 → 隐私与安全性 → 扩展 → Finder"
