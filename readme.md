@@ -2,12 +2,37 @@
 
 ## 快速上手（新同事）
 
+### 安装
+
+**方式一：从 npm 安装（已发布）**
+
 ```bash
-npm i tinyimage -g          # 全局安装
-tiny install-service        # 安装 macOS Finder 快速操作
+npm i tinyimage -g
 ```
 
-安装完成后，在 Finder 选中图片或文件夹，按 `⌘⇧M`（或安装时自定义的快捷键）即可压缩。
+**方式二：从 tarball 安装（内网分发）**
+
+将 `.tgz` 文件发给同事后：
+
+```bash
+npm i tinyimage-<version>.tgz -g
+```
+
+### 配置 macOS Finder 快速操作
+
+安装完成后运行：
+
+```bash
+tiny install-service
+```
+
+按提示设置快捷键（默认 `⌘⇧M`，留空跳过），完成后在 Finder 选中图片或文件夹，按快捷键即可压缩。
+
+### 打包 tarball（维护者）
+
+```bash
+npm run package:npm   # 生成 tinyimage-<version>.tgz，发给同事即可
+```
 
 ---
 
